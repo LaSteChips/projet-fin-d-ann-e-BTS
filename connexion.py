@@ -50,6 +50,7 @@ def save_user():
         conn.commit()
         messagebox.showinfo("Enregistrement réussi", "Utilisateur enregistré avec succès !")
 
+# afficher dans une autre fenêtre la liste d'utilisateurs
 def show_users():
     # Connexion à la base de données SQLite
     connexion = sqlite3.connect("user.db")
