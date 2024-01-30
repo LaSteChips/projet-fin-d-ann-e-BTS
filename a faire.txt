@@ -1,0 +1,6 @@
+✅ - gestion des utilisateurs
+❌ - finir l'app
+    - finir le design
+❌      - connection
+❌      - application
+❌ - la mettre sur serveur
