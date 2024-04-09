@@ -1,6 +1,2 @@
-✅ - gestion des utilisateurs
-❌ - finir l'app
-    - finir le design
-✅      - connection
-❌      - application
-❌ - la mettre sur serveur
+- mettre en place sur une base de données SQL et la sécuriser
+- la mettre sur serveur
