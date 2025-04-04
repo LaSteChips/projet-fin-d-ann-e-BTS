@@ -1,0 +1,57 @@
+{% extends "base.html.j2" %}
+
+{% block style %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styleConnection.css') }}">
+{% endblock %}
+
+{% block title %}
+Connexion
+{% endblock %}
+
+{% block body %}
+<body>
+    <div class="page-container">
+        <div class="login-container">
+            <h2>Connexion</h2>
+            <form action="/" method="post">
+                <label for="username">Nom d'utilisateur:</label>
+                <input type="text" id="username" name="username" required>
+
+                <label for="password">Mot de passe:</label>
+                <input type="password" id="password" name="password" required>
+
+                <button type="submit">Se connecter</button>
+            </form>
+            <p>Pas encore de compte ? <a href="{{ url_for('register') }}">S'inscrire</a></p>
+            <p>Pour supprimer un compte :<a href="{{ url_for('delete_account') }}">Supprimer un compte</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Gestion de l'envoi en JSON du formulaire de connexion
+        document.getElementById('loginForm').addEventListener('submit', function(event) {
+            event.preventDefault();  // Empêche le comportement par défaut (rechargement de la page)
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password })  // Envoie les données en JSON
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect;  // Redirection vers le dashboard
+                } else {
+                    alert(data.error);  // Affichage de l'erreur
+                }
+            })
+            .catch(error => console.error('Erreur:', error));
+        });
+    </script>
+</body>
+{% endblock %}

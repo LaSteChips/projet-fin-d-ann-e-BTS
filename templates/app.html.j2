@@ -1,0 +1,102 @@
+{% extends "base.html.j2" %}
+
+{% block style %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styleApp.css') }}">
+<style>
+    td[contenteditable] {
+        border: 1px dashed transparent;
+        padding: 4px;
+    }
+
+    td[contenteditable]:focus {
+        outline: none;
+        border-color: #333;
+        background-color: #fffde7;
+    }
+</style>
+{% endblock %}
+
+{% block title %}
+Gestion des Appels
+{% endblock %}
+
+{% block body %}
+<body>
+    <div class="page-container">
+        <h2>Gestion des Appels</h2>
+        <form id="callForm" action="{{ url_for('get_page') }}" method="POST">
+            <input type="text" name="nom" placeholder="Nom" required>
+            <input type="text" name="prenom" placeholder="Prénom" required>
+            <input type="text" name="telephone" placeholder="Téléphone" required>
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="text" name="adresse" placeholder="Adresse" required>
+            <textarea name="raison" placeholder="Raison" required></textarea>
+            <button type="submit">Enregistrer l'appel</button>
+        </form>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Prénom</th>
+                        <th>Téléphone</th>
+                        <th>Email</th>
+                        <th>Adresse</th>
+                        <th>Raison</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for appel in appels %}
+                    <tr data-id="{{ appel.id }}">
+                        <td contenteditable="true" data-field="nom">{{ appel.nom }}</td>
+                        <td contenteditable="true" data-field="prenom">{{ appel.prenom }}</td>
+                        <td contenteditable="true" data-field="telephone">{{ appel.telephone }}</td>
+                        <td contenteditable="true" data-field="email">{{ appel.email }}</td>
+                        <td contenteditable="true" data-field="adresse">{{ appel.adresse }}</td>
+                        <td contenteditable="true" data-field="raison">{{ appel.raison }}</td>
+                        <td>
+                            <form onsubmit="return confirmDelete(this);" action="{{ url_for('delete_appel_post', id=appel.id) }}" method="post">
+                                <button type="submit">Supprimer</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Bouton pour accéder à la page backup -->
+        <a href="{{ url_for('backup_page') }}"><button type="button">Accéder à la Backup</button></a>
+    </div>
+
+    <script>
+        document.querySelectorAll('td[contenteditable]').forEach(cell => {
+            cell.addEventListener('blur', async () => {
+                const row = cell.closest('tr');
+                const id = row.dataset.id;
+                const data = {};
+                row.querySelectorAll('td[contenteditable]').forEach(td => {
+                    data[td.dataset.field] = td.innerText.trim();
+                });
+
+                const response = await fetch(`/update_appel/${id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    alert("Erreur lors de la mise à jour !");
+                }
+            });
+        });
+
+        // Confirmation avant suppression
+        function confirmDelete(form) {
+            return confirm("Êtes-vous sûr de vouloir supprimer cet appel ? Cette action est irréversible.");
+        }
+    </script>
+</body>
+{% endblock %}

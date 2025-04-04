@@ -1,0 +1,64 @@
+{% extends "base.html.j2" %}
+
+{% block style %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styleApp.css') }}">
+{% endblock %}
+
+{% block title %}
+Gestion des Backups
+{% endblock %}
+
+{% block body %}
+<div class="page-container">
+    <h2>Gestion des Appels en Backup</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Prénom</th>
+                <th>Téléphone</th>
+                <th>Email</th>
+                <th>Adresse</th>
+                <th>Raison</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for appel in appels %}
+            <tr data-id="{{ appel.id }}">
+                <td>{{ appel.nom }}</td>
+                <td>{{ appel.prenom }}</td>
+                <td>{{ appel.telephone }}</td>
+                <td>{{ appel.email }}</td>
+                <td>{{ appel.adresse }}</td>
+                <td>{{ appel.raison }}</td>
+                <td>
+                    <!-- Formulaire de suppression avec confirmation -->
+                    <form action="{{ url_for('delete_from_backup', id=appel.id) }}" method="post" onsubmit="return confirmDelete(this);">
+                        <button type="submit">Supprimer</button>
+                    </form>
+                    <!-- Formulaire de restauration -->
+                    <form action="{{ url_for('recover_from_backup', id=appel.id) }}" method="post" onsubmit="return confirmRestore(this);">
+                        <button type="submit">Restaurer</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ url_for('get_page') }}"><button type="button">Retour à la gestion des appels</button></a>
+</div>
+
+<script>
+    // Confirmation avant suppression
+    function confirmDelete(form) {
+        return confirm("Êtes-vous sûr de vouloir supprimer cet appel de la sauvegarde ? Cette action est irréversible.");
+    }
+
+    // Confirmation avant restauration
+    function confirmRestore(form) {
+        return confirm("Êtes-vous sûr de vouloir restaurer cet appel dans la gestion ? Cette action est irréversible.");
+    }
+</script>
+{% endblock %}

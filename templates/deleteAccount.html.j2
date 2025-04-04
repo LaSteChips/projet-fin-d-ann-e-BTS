@@ -1,0 +1,85 @@
+{% extends "base.html.j2" %}
+
+{% block style %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styleConnection.css') }}">
+{% endblock %}
+
+{% block title %}
+Suppression
+{% endblock %}
+
+{% block body %}
+<div class="page-container">
+    <div class="login-container">
+        <h2>Supprimer un compte</h2>
+
+        <label for="username">Nom d'utilisateur :</label>
+        <input type="text" id="username" placeholder="Nom d'utilisateur" required>
+
+        <button onclick="showAdminPopup()">Supprimer</button>
+    </div>
+    <p>Déjà un compte ? <a href="/">Se connecter</a></p>
+    <p>Pas encore de compte ? <a href="{{ url_for('register') }}">S'inscrire</a></p>
+</div>
+
+<!-- Pop-up cachée -->
+<div id="adminPopup" class="popup">
+    <div class="popup-content">
+        <h3>Confirmation Admin</h3>
+        <label for="admin_password">Mot de passe admin :</label>
+        <input type="password" id="admin_password" placeholder="Mot de passe" required>
+
+        <button onclick="confirmDelete()">Confirmer</button>
+        <button onclick="closePopup()">Annuler</button>
+    </div>
+</div>
+
+<script>
+    // Fonction pour afficher la pop-up
+    function showAdminPopup() {
+        document.getElementById("adminPopup").style.display = "block";
+    }
+
+    // Fonction pour fermer la pop-up
+    function closePopup() {
+        document.getElementById("adminPopup").style.display = "none";
+    }
+
+    // Fonction pour confirmer la suppression
+    function confirmDelete() {
+        let username = document.getElementById("username").value;
+        let adminPassword = document.getElementById("admin_password").value;
+
+        // Vérifier si les champs sont bien remplis
+        if (!username || !adminPassword) {
+            alert("Veuillez remplir tous les champs !");
+            return;
+        }
+
+        // Envoi de la requête fetch
+        fetch('/delete_account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: username,
+                admin_password: adminPassword
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.success || data.error);  // Afficher le message
+            if (data.success) {
+                // Recharger la page ou rediriger ailleurs en cas de succès
+                location.reload();  // Recharger la page pour mettre à jour la liste des utilisateurs
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Une erreur s\'est produite');
+        });
+
+        closePopup();  // Fermer la pop-up après avoir tenté la suppression
+    }
+</script>
+
+{% endblock %}

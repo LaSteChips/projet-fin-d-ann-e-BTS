@@ -5,30 +5,19 @@ import sqlite3
 app = Flask(__name__)
 app.secret_key = 'votre_cle_secrete'
 
-# --- Fonctions de connexion aux bases de données ---
+# Connexion à la base de données utilisateur
 def get_db_connection_user():
     conn = sqlite3.connect('user.db')
     conn.row_factory = sqlite3.Row
     return conn
 
+# Connexion à la base de données gestion
 def get_db_connection_gestion():
     conn = sqlite3.connect('gestion.db')
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_db_connection_backup():
-    conn = sqlite3.connect('backup.db')
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def get_db_connection_old_backup():
-    conn = sqlite3.connect('old_backup.db')
-    conn.row_factory = sqlite3.Row
-    return conn
-
-# --- Initialisation des tables ---
-
-# Table des utilisateurs
+# Création des tables utilisateurs
 with get_db_connection_user() as conn:
     conn.execute('''CREATE TABLE IF NOT EXISTS user (
                         id INTEGER PRIMARY KEY,
@@ -36,7 +25,7 @@ with get_db_connection_user() as conn:
                         password TEXT)''')
     conn.commit()
 
-# Table des appels
+# Création des tables gestion
 with get_db_connection_gestion() as conn:
     conn.execute('''CREATE TABLE IF NOT EXISTS appels (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +37,7 @@ with get_db_connection_gestion() as conn:
                         raison TEXT)''')
     conn.commit()
 
-# Table des appels pour backup
+# Backup des appels
 with get_db_connection_gestion() as conn:
     conn.execute('''CREATE TABLE IF NOT EXISTS appels_backup (
                         id INTEGER,
@@ -60,22 +49,7 @@ with get_db_connection_gestion() as conn:
                         raison TEXT)''')
     conn.commit()
 
-# Table des appels anciens (old_backup)
-with get_db_connection_old_backup() as conn:
-    conn.execute('''CREATE TABLE IF NOT EXISTS appels_old_backup (
-                        id INTEGER,
-                        nom TEXT,
-                        prenom TEXT,
-                        telephone TEXT,
-                        email TEXT,
-                        adresse TEXT,
-                        raison TEXT)''')
-    conn.commit()
-
-# ===============================
-# === Modules de connexion    ===
-# ===============================
-
+# Route de connexion
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -93,6 +67,24 @@ def login():
 
             return jsonify({'error': 'Identifiants incorrects'}), 400
     return render_template('login.html.j2')
+
+# Connexion à la base de données backup
+def get_db_connection_backup():
+    conn = sqlite3.connect('backup.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# Création de la table backup
+with get_db_connection_backup() as conn:
+    conn.execute('''CREATE TABLE IF NOT EXISTS appels_backup (
+                        id INTEGER,
+                        nom TEXT,
+                        prenom TEXT,
+                        telephone TEXT,
+                        email TEXT,
+                        adresse TEXT,
+                        raison TEXT)''')
+    conn.commit()
 
 # Route d'enregistrement
 @app.route('/register', methods=['GET', 'POST'])
@@ -162,19 +154,88 @@ def delete_account():
 
     return render_template('deleteAccount.html.j2')
 
-# ===============================
-# === Modules de l’application ===
-# ===============================
+# Route pour afficher les appels dans backup.db
+@app.route('/backup', methods=['GET'])
+def backup_page():
+    with get_db_connection_backup() as conn:
+        appels_backup = conn.execute("SELECT * FROM appels_backup").fetchall()
+    return render_template('backup.html.j2', appels=appels_backup)
 
-# Route principale de l'application
+# Backup des appels supprimés (Old Backup)
+with get_db_connection_gestion() as conn:
+    conn.execute('''CREATE TABLE IF NOT EXISTS appels_old_backup (
+                        id INTEGER,
+                        nom TEXT,
+                        prenom TEXT,
+                        telephone TEXT,
+                        email TEXT,
+                        adresse TEXT,
+                        raison TEXT)''')
+    conn.commit()
+
+# Route pour afficher les appels dans old_backup.db
+@app.route('/old_backup', methods=['GET'])
+def view_old_backup():
+    with get_db_connection_gestion() as conn:
+        old_backup_calls = conn.execute("SELECT * FROM appels_old_backup").fetchall()
+    return render_template('old_backup.html.j2', appels=old_backup_calls)
+
+# Route pour supprimer un appel définitivement (dans old_backup.db)
+@app.route('/delete_old_backup/<int:id>', methods=['POST'])
+def delete_old_backup(id):
+    with get_db_connection_gestion() as conn:
+        appel = conn.execute("SELECT * FROM appels_backup WHERE id = ?", (id,)).fetchone()
+        if appel:
+            # Déplacer vers old_backup
+            with get_db_connection_gestion() as archive_conn:
+                archive_conn.execute('''INSERT INTO appels_old_backup (id, nom, prenom, telephone, email, adresse, raison) 
+                                        VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                                    (appel['id'], appel['nom'], appel['prenom'], appel['telephone'],
+                                     appel['email'], appel['adresse'], appel['raison']))
+                archive_conn.commit()
+
+            # Supprimer de backup.db
+            conn.execute("DELETE FROM appels_backup WHERE id = ?", (id,))
+            conn.commit()
+    return redirect(url_for('view_old_backup'))
+
+# Route pour supprimer un appel de backup
+@app.route('/delete_from_backup/<int:id>', methods=['POST'])
+def delete_from_backup(id):
+    with get_db_connection_backup() as conn:
+        # Supprimer l'appel de la table appels_backup
+        conn.execute("DELETE FROM appels_backup WHERE id = ?", (id,))
+        conn.commit()
+    return redirect(url_for('backup_page'))  # Rediriger vers la page de backup après suppression
+
+
+# Route pour récupérer un appel dans gestion.db
+@app.route('/recover_old_backup/<int:id>', methods=['POST'])
+def recover_old_backup(id):
+    with get_db_connection_gestion() as conn:
+        appel = conn.execute("SELECT * FROM appels_old_backup WHERE id = ?", (id,)).fetchone()
+        if appel:
+            # Remettre dans gestion.db
+            with get_db_connection_gestion() as gestion_conn:
+                gestion_conn.execute('''INSERT INTO appels (id, nom, prenom, telephone, email, adresse, raison) 
+                                        VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                                    (appel['id'], appel['nom'], appel['prenom'], appel['telephone'],
+                                     appel['email'], appel['adresse'], appel['raison']))
+                gestion_conn.commit()
+
+            # Supprimer de old_backup.db
+            conn.execute("DELETE FROM appels_old_backup WHERE id = ?", (id,))
+            conn.commit()
+    return redirect(url_for('view_old_backup'))
+
+# Route pour afficher les appels
 @app.route('/app', methods=['GET', 'POST'])
 def get_page():
     if 'username' not in session:
         return redirect(url_for('login'))
-
+    
     if request.method == 'POST':
         data = request.form
-        # Vérifier que toutes les données sont présentes
         if all(data.get(k) for k in ['nom', 'prenom', 'telephone', 'email', 'adresse', 'raison']):
             with get_db_connection_gestion() as conn:
                 conn.execute('''INSERT INTO appels (nom, prenom, telephone, email, adresse, raison) 
@@ -183,7 +244,6 @@ def get_page():
                 conn.commit()
         return redirect(url_for('get_page'))
 
-    # Récupérer les appels depuis la base de données
     with get_db_connection_gestion() as conn:
         appels = conn.execute("SELECT * FROM appels").fetchall()
     return render_template('app.html.j2', appels=appels)
@@ -194,7 +254,7 @@ def delete_appel_post(id):
     with get_db_connection_gestion() as gestion_conn:
         appel = gestion_conn.execute("SELECT * FROM appels WHERE id = ?", (id,)).fetchone()
         if appel:
-            # Sauvegarder l'appel dans backup
+            # Backup dans backup.db
             with get_db_connection_backup() as backup_conn:
                 backup_conn.execute('''INSERT INTO appels_backup 
                     (id, nom, prenom, telephone, email, adresse, raison) 
@@ -202,7 +262,8 @@ def delete_appel_post(id):
                     (appel['id'], appel['nom'], appel['prenom'], appel['telephone'],
                      appel['email'], appel['adresse'], appel['raison']))
                 backup_conn.commit()
-            # Supprimer l'appel de la base principale
+
+            # Suppression dans gestion.db
             gestion_conn.execute("DELETE FROM appels WHERE id = ?", (id,))
             gestion_conn.commit()
     return redirect(url_for('get_page'))
@@ -218,94 +279,6 @@ def update_appel(id):
                      (data['nom'], data['prenom'], data['telephone'], data['email'], data['adresse'], data['raison'], id))
         conn.commit()
     return jsonify(success=True)
-
-# ===============================
-# === Modules de backup ===
-# ===============================
-
-# Route pour afficher les appels dans backup.db
-@app.route('/backup', methods=['GET'])
-def backup_page():
-    with get_db_connection_backup() as conn:
-        appels_backup = conn.execute("SELECT * FROM appels_backup").fetchall()
-    return render_template('backup.html.j2', appels=appels_backup)
-
-# Route pour supprimer un appel de backup.db
-@app.route('/delete_from_backup/<int:id>', methods=['POST'])
-def delete_from_backup(id):
-    with get_db_connection_backup() as backup_conn:
-        appel = backup_conn.execute("SELECT * FROM appels_backup WHERE id = ?", (id,)).fetchone()
-        if appel:
-            # Sauvegarder dans old_backup.db avant suppression de backup.db
-            with get_db_connection_old_backup() as old_backup_conn:
-                old_backup_conn.execute('''INSERT INTO appels_old_backup 
-                    (id, nom, prenom, telephone, email, adresse, raison) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                    (appel['id'], appel['nom'], appel['prenom'], appel['telephone'],
-                     appel['email'], appel['adresse'], appel['raison']))
-                old_backup_conn.commit()
-
-            # Supprimer l'appel de backup.db
-            backup_conn.execute("DELETE FROM appels_backup WHERE id = ?", (id,))
-            backup_conn.commit()
-
-    return redirect(url_for('backup_page'))
-
-# ===============================
-# === Modules old_backup ===
-# ===============================
-
-# Route pour afficher les appels dans old_backup.db
-@app.route('/old_backup', methods=['GET'])
-def view_old_backup():
-    with get_db_connection_old_backup() as conn:
-        old_backup_calls = conn.execute("SELECT * FROM appels_old_backup").fetchall()
-    return render_template('old_backup.html.j2', appels=old_backup_calls)
-
-# Route pour supprimer un appel définitivement (dans old_backup.db)
-@app.route('/delete_old_backup/<int:id>', methods=['POST'])
-def delete_old_backup(id):
-    with get_db_connection_gestion() as conn:
-        appel = conn.execute("SELECT * FROM appels_backup WHERE id = ?", (id,)).fetchone()
-        if appel:
-            # Déplacer vers old_backup
-            with get_db_connection_old_backup() as archive_conn:
-                archive_conn.execute('''INSERT INTO appels_old_backup (id, nom, prenom, telephone, email, adresse, raison) 
-                                        VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                                    (appel['id'], appel['nom'], appel['prenom'], appel['telephone'],
-                                     appel['email'], appel['adresse'], appel['raison']))
-                archive_conn.commit()
-
-            # Supprimer de backup.db
-            conn.execute("DELETE FROM appels_backup WHERE id = ?", (id,))
-            conn.commit()
-
-    return redirect(url_for('view_old_backup'))
-
-# Route pour récupérer un appel depuis backup.db et le remettre dans gestion.db
-@app.route('/recover_from_backup/<int:id>', methods=['POST'])
-def recover_from_backup(id):
-    with get_db_connection_backup() as backup_conn:
-        appel = backup_conn.execute("SELECT * FROM appels_backup WHERE id = ?", (id,)).fetchone()
-        if appel:
-            # Remettre dans gestion.db
-            with get_db_connection_gestion() as gestion_conn:
-                gestion_conn.execute('''INSERT INTO appels (id, nom, prenom, telephone, email, adresse, raison) 
-                                        VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                                    (appel['id'], appel['nom'], appel['prenom'], appel['telephone'],
-                                     appel['email'], appel['adresse'], appel['raison']))
-                gestion_conn.commit()
-
-            # Supprimer de backup.db
-            backup_conn.execute("DELETE FROM appels_backup WHERE id = ?", (id,))
-            backup_conn.commit()
-
-    return redirect(url_for('backup_page'))  # Rediriger vers la page de backup
-
-
-# ================================
-# === Lancement de l'app ===
-# ================================
 
 if __name__ == '__main__':
     app.run(debug=True)
