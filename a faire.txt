@@ -1,2 +1,0 @@
-- mettre en place sur une base de données SQL et la sécuriser
-- la mettre sur serveur
