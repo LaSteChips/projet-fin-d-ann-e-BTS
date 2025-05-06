@@ -22,7 +22,7 @@ def open_app():
     global logged_in_username  # Utilisation de la variable globale
     logged_in_username = entry_username.get()  # Stockage du nom d'utilisateur connecté
     window.destroy()    
-    subprocess.run(["python", "app_test.py", "--username", logged_in_username])  # Passez le nom d'utilisateur comme argument à app_modified.py
+    subprocess.run(["python", "app.py", "--username", logged_in_username])  # Passez le nom d'utilisateur comme argument à app_modified.py
 
 
 # Fonction pour vérifier l'utilisateur
